@@ -1,0 +1,73 @@
+#!/usr/bin/env node
+
+var fs = require('fs'),
+  cli = require('commander'),
+  KeePass = require('keepass.io'),
+  db = new KeePass(),
+  sjcl = require('sjcl');
+
+cli.version('0.0.1');
+
+cli
+  .command('convert-kdbx <filename>')
+  .description("Converts a keepass 2 database to a drake chest")
+  .action(function(fname) {
+    var opts = {fname: fname};
+    cli.password("Password for " + fname + ": ", function(pass) {
+      db.setCredentials({
+        password: pass
+      });
+      loadDb(opts);
+    });
+  });
+
+function basename(s) {
+  return s.split('.').reverse().splice(1).reverse().join('.');
+}
+
+function loadDb(opts) {
+  db.load(opts.fname, function(err, data) {
+    if (err) throw err;
+    var entries = getEntries(data);
+    console.log("Found " + entries.length + " entries");
+    var chestFname = basename(opts.fname) + '.chest';
+    cli.password("Set password for " + chestFname + ": ", function(pass) {
+      var ciphertext = sjcl.encrypt(pass, JSON.stringify(entries));
+      fs.writeFile(chestFname, ciphertext, function(err) {
+        if (err) throw err;
+        console.log(opts.fname + " -> " + chestFname);
+      });
+    })
+  });
+}
+
+function getEntries(data, d) {
+  d = d || 0;
+  var entries = [];
+  var trashed = false;
+  if (data.name == "Recycle Bin") {
+    trashed = true;
+  }
+  if (d == 2 && data.name == "Backup") {
+    trashed = true;
+  }
+  if (data.entries) {
+    Object.keys(data.entries).forEach(function(k) {
+      var entry = data.entries[k];
+      entries.push({
+        id: k,
+        title: entry.title,
+        username: entry.username,
+        password: entry.password,
+        url: entry.url,
+        trashed: trashed
+      });
+    });
+  }
+  Object.keys(data.groups).forEach(function(k) {
+    entries = entries.concat(getEntries(data.groups[k], d + 1));
+  });
+  return entries;
+}
+
+cli.parse(process.argv);

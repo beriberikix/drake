@@ -17,5 +17,11 @@
     "google-drive"
   ],
   "author": "Mark Steve Samson <hello@marksteve.com>",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "sjcl": "*",
+    "keepass.io": "~0.2.6",
+    "commander": "~1.3.2"
+  },
+  "bin": {"drake": "./bin/drake"}
 }
